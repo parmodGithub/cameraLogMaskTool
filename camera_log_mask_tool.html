@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qualcomm Camera Log Mask Tool</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #f0f2f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            padding: 14px 24px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+        }
+        .header-icon { font-size: 28px; line-height: 1; }
+        .header-text h1 { font-size: 19px; font-weight: 700; letter-spacing: 0.3px; }
+        .header-text p { font-size: 12px; color: #9ab; margin-top: 2px; }
+
+        .tabs {
+            display: flex;
+            background: #16213e;
+            padding: 0 24px;
+            border-bottom: 1px solid #0f3460;
+        }
+        .tab {
+            padding: 11px 22px;
+            color: #8899aa;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-size: 13.5px;
+            font-weight: 500;
+            transition: color 0.2s;
+            user-select: none;
+        }
+        .tab:hover { color: #ccd; }
+        .tab.active { color: #fff; border-bottom-color: #e94560; }
+
+        .tab-content { display: none; padding: 20px 24px; }
+        .tab-content.active {
+            display: flex;
+            gap: 20px;
+            min-height: calc(100vh - 110px);
+        }
+
+        .left-panel {
+            width: 290px;
+            flex-shrink: 0;
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .mask-input-label { font-size: 11.5px; color: #777; margin-bottom: 3px; }
+        .mask-input {
+            width: 100%;
+            padding: 7px 11px;
+            border: 1.5px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            transition: border-color 0.2s;
+            background: #fafafa;
+        }
+        .mask-input:focus { outline: none; border-color: #e94560; background: #fff; }
+
+        .btn-row { display: flex; gap: 8px; }
+        .btn {
+            flex: 1;
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12.5px;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+        .btn-dark { background: #1a1a2e; color: #fff; }
+        .btn-dark:hover { background: #0f3460; }
+        .btn-light { background: #f0f0f0; color: #444; border: 1px solid #ddd; }
+        .btn-light:hover { background: #e0e0e0; }
+
+        .count-badge { font-size: 12px; color: #888; }
+        .count-badge strong { color: #e94560; }
+
+        .checkbox-list {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            border-radius: 7px;
+            padding: 4px 2px;
+        }
+        .checkbox-list::-webkit-scrollbar { width: 5px; }
+        .checkbox-list::-webkit-scrollbar-track { background: #f5f5f5; }
+        .checkbox-list::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+        .cb-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 5px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .cb-item:hover { background: #f7f7f7; }
+        .cb-item input[type="checkbox"] {
+            margin-top: 3px;
+            margin-right: 8px;
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            accent-color: #e94560;
+            flex-shrink: 0;
+        }
+        .cb-label { cursor: pointer; }
+        .cb-name { font-size: 13px; font-weight: 600; color: #222; line-height: 1.3; }
+        .cb-name .suffix { color: #e94560; }
+        .cb-meta { font-size: 11px; color: #999; margin-top: 1px; }
+        .cb-note {
+            display: inline-block;
+            background: #fff3cd;
+            color: #856404;
+            font-size: 10px;
+            padding: 0 4px;
+            border-radius: 3px;
+            margin-left: 4px;
+            vertical-align: middle;
+        }
+
+        .right-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .info-card {
+            background: #e8f4fd;
+            border-left: 4px solid #2196F3;
+            padding: 11px 15px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #444;
+            line-height: 1.6;
+        }
+        .info-card code {
+            background: #d0e8f8;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .mask-display {
+            background: #fff;
+            border-radius: 10px;
+            padding: 14px 20px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+        .mask-display-item { display: flex; flex-direction: column; }
+        .mask-display-label { font-size: 11.5px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .mask-display-value { font-size: 24px; font-weight: 700; color: #1a1a2e; font-family: 'Courier New', monospace; }
+        .mask-display-dec { font-size: 13px; color: #666; font-family: 'Courier New', monospace; }
+
+        .commands-card {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+            flex: 1;
+        }
+        .commands-header {
+            background: #1a1a2e;
+            color: #ccd;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12.5px;
+            font-weight: 500;
+        }
+        .copy-btn {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 5px 14px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .copy-btn:hover { background: #c73652; }
+        .copy-btn.copied { background: #27ae60; }
+
+        .commands-body {
+            background: #0d1117;
+            color: #e6edf3;
+            padding: 16px 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 2;
+            min-height: 160px;
+            overflow-x: auto;
+        }
+        .cmd-line { display: block; white-space: nowrap; }
+        .cmd-kw { color: #ff7b72; }
+        .cmd-str { color: #a5d6ff; }
+        .cmd-val { color: #ffa657; font-weight: 700; }
+        .cmd-comment { color: #6e7681; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-icon">&#128247;</div>
+    <div class="header-text">
+        <h1>Qualcomm Camera Log Mask Tool</h1>
+        <p>Generate ADB commands for camera logging &mdash; UMD &bull; KMD &bull; CSID</p>
+    </div>
+</div>
+
+<div class="tabs">
+    <div class="tab active"   onclick="switchTab(event,'umd')">&#128196; UMD Log Groups</div>
+    <div class="tab"          onclick="switchTab(event,'kmd')">&#9881; KMD Log Groups</div>
+    <div class="tab"          onclick="switchTab(event,'csid')">&#128268; CSID Debug Groups</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ UMD TAB -->
+<div id="tab-umd" class="tab-content active">
+    <div class="left-panel">
+        <div>
+            <div class="mask-input-label">Enter mask to pre-select groups (e.g. 0x10080)</div>
+            <input class="mask-input" id="umd-mask-input" placeholder="e.g. 0x0"
+                   oninput="applyMaskToCheckboxes('umd',this.value)">
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-dark"  onclick="selectAll('umd')">Select all</button>
+            <button class="btn btn-light" onclick="unselectAll('umd')">Unselect all</button>
+        </div>
+        <div class="count-badge" id="umd-count">Selected: <strong>0</strong> groups</div>
+        <div class="checkbox-list" id="umd-checkboxes"></div>
+    </div>
+    <div class="right-panel">
+        <div class="info-card">
+            Select UMD modules to enable logging. The computed mask applies to
+            <code>logConfigMask</code>, <code>logInfoMask</code>, and <code>logVerboseMask</code>
+            in <code>/vendor/etc/camera/camxoverridesettings.txt</code>.
+            Use <code>0xFFFFFFFFFFFFFFFF</code> to enable all groups.
+        </div>
+        <div class="mask-display">
+            <div class="mask-display-item">
+                <div class="mask-display-label">Computed Mask (hex)</div>
+                <div class="mask-display-value" id="umd-mask-hex">0x0</div>
+            </div>
+            <div class="mask-display-item">
+                <div class="mask-display-label">Decimal</div>
+                <div class="mask-display-dec" id="umd-mask-dec">0</div>
+            </div>
+        </div>
+        <div class="commands-card">
+            <div class="commands-header">
+                <span>ADB Commands &mdash; camxoverridesettings.txt</span>
+                <button class="copy-btn" id="umd-copy-btn" onclick="copyCommands('umd')">&#128203; Copy</button>
+            </div>
+            <div class="commands-body" id="umd-commands-body"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ KMD TAB -->
+<div id="tab-kmd" class="tab-content">
+    <div class="left-panel">
+        <div>
+            <div class="mask-input-label">Enter mask to pre-select groups (e.g. 0x120)</div>
+            <input class="mask-input" id="kmd-mask-input" placeholder="e.g. 0x0"
+                   oninput="applyMaskToCheckboxes('kmd',this.value)">
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-dark"  onclick="selectAll('kmd')">Select all</button>
+            <button class="btn btn-light" onclick="unselectAll('kmd')">Unselect all</button>
+        </div>
+        <div class="count-badge" id="kmd-count">Selected: <strong>0</strong> groups</div>
+        <div class="checkbox-list" id="kmd-checkboxes"></div>
+    </div>
+    <div class="right-panel">
+        <div class="info-card">
+            Select KMD modules to enable kernel-mode driver logging. The mask is written to
+            <code>/sys/module/cam_debug_util/parameters/debug_mdl</code>.
+            No device reboot required. Logs appear in <code>/proc/kmsg</code>.
+        </div>
+        <div class="mask-display">
+            <div class="mask-display-item">
+                <div class="mask-display-label">Computed Mask (hex)</div>
+                <div class="mask-display-value" id="kmd-mask-hex">0x0</div>
+            </div>
+            <div class="mask-display-item">
+                <div class="mask-display-label">Decimal</div>
+                <div class="mask-display-dec" id="kmd-mask-dec">0</div>
+            </div>
+        </div>
+        <div class="commands-card">
+            <div class="commands-header">
+                <span>ADB Commands &mdash; KMD debug_mdl</span>
+                <button class="copy-btn" id="kmd-copy-btn" onclick="copyCommands('kmd')">&#128203; Copy</button>
+            </div>
+            <div class="commands-body" id="kmd-commands-body"></div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ CSID TAB -->
+<div id="tab-csid" class="tab-content">
+    <div class="left-panel">
+        <div>
+            <div class="mask-input-label">Enter mask to pre-select groups (e.g. 0x3)</div>
+            <input class="mask-input" id="csid-mask-input" placeholder="e.g. 0x0"
+                   oninput="applyMaskToCheckboxes('csid',this.value)">
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-dark"  onclick="selectAll('csid')">Select all</button>
+            <button class="btn btn-light" onclick="unselectAll('csid')">Unselect all</button>
+        </div>
+        <div class="count-badge" id="csid-count">Selected: <strong>0</strong> groups</div>
+        <div class="checkbox-list" id="csid-checkboxes"></div>
+    </div>
+    <div class="right-panel">
+        <div class="info-card">
+            Select CSID debug groups to enable CSID IRQ logging. The mask is written to
+            <code>/sys/kernel/debug/camera_ife/ife_csid_debug</code>.
+            ISP kernel log (<code>CAM_ISP = 0x8</code>) must also be enabled. No reboot required.
+        </div>
+        <div class="mask-display">
+            <div class="mask-display-item">
+                <div class="mask-display-label">Computed Mask (hex)</div>
+                <div class="mask-display-value" id="csid-mask-hex">0x0</div>
+            </div>
+            <div class="mask-display-item">
+                <div class="mask-display-label">Decimal</div>
+                <div class="mask-display-dec" id="csid-mask-dec">0</div>
+            </div>
+        </div>
+        <div class="commands-card">
+            <div class="commands-header">
+                <span>ADB Commands &mdash; CSID Debug</span>
+                <button class="copy-btn" id="csid-copy-btn" onclick="copyCommands('csid')">&#128203; Copy</button>
+            </div>
+            <div class="commands-body" id="csid-commands-body"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============================================================
+//  DATA  — sourced from camxtypes.h
+// ============================================================
+
+var UMD_GROUPS = [
+    { id:'AFD',       bit:0,  prefix:'CamxLogGroup', suffix:'AFD',       desc:'Auto Flicker Detection' },
+    { id:'Sensor',    bit:1,  prefix:'CamxLogGroup', suffix:'Sensor',    desc:'Sensor' },
+    { id:'Tracker',   bit:2,  prefix:'CamxLogGroup', suffix:'Tracker',   desc:'Tracker / IFace' },
+    { id:'ISP',       bit:3,  prefix:'CamxLogGroup', suffix:'ISP',       desc:'Image Signal Processor' },
+    { id:'PProc',     bit:4,  prefix:'CamxLogGroup', suffix:'PProc',     desc:'Post Processor' },
+    { id:'MemMgr',    bit:5,  prefix:'CamxLogGroup', suffix:'MemMgr',    desc:'Memory Manager' },
+    { id:'Power',     bit:6,  prefix:'CamxLogGroup', suffix:'Power',     desc:'Power (clock, bandwidth)' },
+    { id:'HAL',       bit:7,  prefix:'CamxLogGroup', suffix:'HAL',       desc:'Hardware Abstraction Layer' },
+    { id:'JPEG',      bit:8,  prefix:'CamxLogGroup', suffix:'JPEG',      desc:'JPEG' },
+    { id:'Stats',     bit:9,  prefix:'CamxLogGroup', suffix:'Stats',     desc:'Stats / 3A Algorithms' },
+    { id:'CSL',       bit:10, prefix:'CamxLogGroup', suffix:'CSL',       desc:'Camera Service Layer' },
+    { id:'App',       bit:11, prefix:'CamxLogGroup', suffix:'App',       desc:'Application' },
+    { id:'Utils',     bit:12, prefix:'CamxLogGroup', suffix:'Utils',     desc:'Utilities' },
+    { id:'Sync',      bit:13, prefix:'CamxLogGroup', suffix:'Sync',      desc:'Sync / Mutex / Fences' },
+    { id:'MemSpy',    bit:14, prefix:'CamxLogGroup', suffix:'MemSpy',    desc:'Memory Tracker (MemSpy)' },
+    { id:'Format',    bit:15, prefix:'CamxLogGroup', suffix:'Format',    desc:'Format' },
+    { id:'Core',      bit:16, prefix:'CamxLogGroup', suffix:'Core',      desc:'Core Camera System' },
+    { id:'HWL',       bit:17, prefix:'CamxLogGroup', suffix:'HWL',       desc:'Hardware Layer' },
+    { id:'Chi',       bit:18, prefix:'CamxLogGroup', suffix:'Chi',       desc:'Camera HAL Interface (CHI)' },
+    { id:'DRQ',       bit:19, prefix:'CamxLogGroup', suffix:'DRQ',       desc:'Deferred Request Queue' },
+    { id:'FD',        bit:20, prefix:'CamxLogGroup', suffix:'FD',        desc:'Face Detection' },
+    { id:'IQMod',     bit:21, prefix:'CamxLogGroup', suffix:'IQMod',     desc:'IQ Module' },
+    { id:'LRME',      bit:22, prefix:'CamxLogGroup', suffix:'LRME',      desc:'Low Resolution Motion Estimation', note:'shared bit with CVP' },
+    { id:'CVP',       bit:22, prefix:'CamxLogGroup', suffix:'CVP',       desc:'Computer Vision Processor', note:'shared bit with LRME' },
+    { id:'NCS',       bit:23, prefix:'CamxLogGroup', suffix:'NCS',       desc:'Non-Camera Sensor' },
+    { id:'Meta',      bit:24, prefix:'CamxLogGroup', suffix:'Meta',      desc:'Metadata' },
+    { id:'AEC',       bit:25, prefix:'CamxLogGroup', suffix:'AEC',       desc:'Auto Exposure Control' },
+    { id:'AWB',       bit:26, prefix:'CamxLogGroup', suffix:'AWB',       desc:'Auto White Balance' },
+    { id:'AF',        bit:27, prefix:'CamxLogGroup', suffix:'AF',        desc:'Auto Focus' },
+    { id:'SWP',       bit:28, prefix:'CamxLogGroup', suffix:'SWP',       desc:'SW Process' },
+    { id:'Hist',      bit:29, prefix:'CamxLogGroup', suffix:'Hist',      desc:'Histogram Process' },
+    { id:'BPS',       bit:30, prefix:'CamxLogGroup', suffix:'BPS',       desc:'Bayer Processing Section' },
+    { id:'DebugData', bit:31, prefix:'CamxLogGroup', suffix:'DebugData', desc:'Debug-Data / 3A Tuning Metadata' },
+    { id:'QSAT',      bit:32, prefix:'CamxLogGroup', suffix:'QSAT',      desc:'QSAT' },
+    { id:'QLL',       bit:9,  prefix:'CamxLogGroup', suffix:'QLL',       desc:'QLL (shares Stats bit)', note:'same as Stats' },
+    { id:'PSM',       bit:33, prefix:'CamxLogGroup', suffix:'PSM',       desc:'Port Specific Metadata' },
+    { id:'StatsNN',   bit:34, prefix:'CamxLogGroup', suffix:'StatsNN',   desc:'Stats Neural Network' },
+    { id:'CRE',       bit:35, prefix:'CamxLogGroup', suffix:'CRE',       desc:'Camera Reformat Engine' },
+    { id:'AWBR',      bit:36, prefix:'CamxLogGroup', suffix:'AWBR',      desc:'AWB Remosaic' },
+    { id:'ITOF',      bit:37, prefix:'CamxLogGroup', suffix:'ITOF',      desc:'Indirect Time of Flight' },
+    { id:'Perf',      bit:38, prefix:'CamxLogGroup', suffix:'Perf',      desc:'Performance' }
+];
+
+var KMD_GROUPS = [
+    { id:'CDM',      bit:0,  prefix:'CAM_', suffix:'CDM',      desc:'Camera Data Mover' },
+    { id:'CORE',     bit:1,  prefix:'CAM_', suffix:'CORE',     desc:'Camera Core' },
+    { id:'CPAS',     bit:2,  prefix:'CAM_', suffix:'CPAS',     desc:'Camera Peripherals and Support' },
+    { id:'ISP',      bit:3,  prefix:'CAM_', suffix:'ISP',      desc:'Image Signal Processor' },
+    { id:'CRM',      bit:4,  prefix:'CAM_', suffix:'CRM',      desc:'Camera Request Manager' },
+    { id:'SENSOR',   bit:5,  prefix:'CAM_', suffix:'SENSOR',   desc:'Sensor' },
+    { id:'SMMU',     bit:6,  prefix:'CAM_', suffix:'SMMU',     desc:'Shared Memory Management Unit' },
+    { id:'SYNC',     bit:7,  prefix:'CAM_', suffix:'SYNC',     desc:'Synchronization' },
+    { id:'ICP',      bit:8,  prefix:'CAM_', suffix:'ICP',      desc:'Image Control Processor' },
+    { id:'JPEG',     bit:9,  prefix:'CAM_', suffix:'JPEG',     desc:'JPEG' },
+    { id:'FD',       bit:10, prefix:'CAM_', suffix:'FD',       desc:'Face Detection' },
+    { id:'LRME',     bit:11, prefix:'CAM_', suffix:'LRME',     desc:'Low Resolution Motion Estimation' },
+    { id:'FLASH',    bit:12, prefix:'CAM_', suffix:'FLASH',    desc:'Flash' },
+    { id:'ACTUATOR', bit:13, prefix:'CAM_', suffix:'ACTUATOR', desc:'Actuator' },
+    { id:'CCI',      bit:14, prefix:'CAM_', suffix:'CCI',      desc:'Camera Control Interface' },
+    { id:'CSIPHY',   bit:15, prefix:'CAM_', suffix:'CSIPHY',   desc:'Camera Serial Interface PHY' },
+    { id:'EEPROM',   bit:16, prefix:'CAM_', suffix:'EEPROM',   desc:'EEPROM' },
+    { id:'UTIL',     bit:17, prefix:'CAM_', suffix:'UTIL',     desc:'Utilities' },
+    { id:'HFI',      bit:18, prefix:'CAM_', suffix:'HFI',      desc:'Host-Firmware Interface' },
+    { id:'CTXT',     bit:19, prefix:'CAM_', suffix:'CTXT',     desc:'Camera Context' },
+    { id:'OIS',      bit:20, prefix:'CAM_', suffix:'OIS',      desc:'Optical Image Stabilization' },
+    { id:'RES',      bit:21, prefix:'CAM_', suffix:'RES',      desc:'Camera Shared Resource API' },
+    { id:'MEM',      bit:22, prefix:'CAM_', suffix:'MEM',      desc:'Camera Memory Manager' },
+    { id:'IRQ_CTRL', bit:23, prefix:'CAM_', suffix:'IRQ_CTRL', desc:'IRQ Controller Events' },
+    { id:'REQ',      bit:24, prefix:'CAM_', suffix:'REQ',      desc:'Request Tracking (KMD)' },
+    { id:'PERF',     bit:25, prefix:'CAM_', suffix:'PERF',     desc:'Performance (clock, BW, etc.)' },
+    { id:'CUSTOM',   bit:26, prefix:'CAM_', suffix:'CUSTOM',   desc:'Custom Hardware Node' },
+    { id:'OPE',      bit:28, prefix:'CAM_', suffix:'OPE',      desc:'OPE Module (SM4250/SM6115)' }
+];
+
+var CSID_GROUPS = [
+    { id:'SOF_IRQ',   bit:0, prefix:'CSID_DEBUG_ENABLE_', suffix:'SOF_IRQ',          desc:'Start of Frame IRQ' },
+    { id:'EOF_IRQ',   bit:1, prefix:'CSID_DEBUG_ENABLE_', suffix:'EOF_IRQ',          desc:'End of Frame IRQ' },
+    { id:'SOT_IRQ',   bit:2, prefix:'CSID_DEBUG_ENABLE_', suffix:'SOT_IRQ',          desc:'Start of Transmission IRQ' },
+    { id:'EOT_IRQ',   bit:3, prefix:'CSID_DEBUG_ENABLE_', suffix:'EOT_IRQ',          desc:'End of Transmission IRQ' },
+    { id:'SHORT_PKT', bit:4, prefix:'CSID_DEBUG_ENABLE_', suffix:'SHORT_PKT_CAPTURE', desc:'Short Packet Capture' },
+    { id:'LONG_PKT',  bit:5, prefix:'CSID_DEBUG_ENABLE_', suffix:'LONG_PKT_CAPTURE',  desc:'Long Packet Capture' },
+    { id:'CPHY_PKT',  bit:6, prefix:'CSID_DEBUG_ENABLE_', suffix:'CPHY_PKT_CAPTURE',  desc:'CPHY Packet Capture' },
+    { id:'HBI_VBI',   bit:7, prefix:'CSID_DEBUG_ENABLE_', suffix:'HBI_VBI_INFO',      desc:'HBI / VBI Info' }
+];
+
+// ============================================================
+//  STATE
+// ============================================================
+var state = { umd: {}, kmd: {}, csid: {} };
+
+// ============================================================
+//  INIT
+// ============================================================
+function init() {
+    renderCheckboxes('umd',  UMD_GROUPS);
+    renderCheckboxes('kmd',  KMD_GROUPS);
+    renderCheckboxes('csid', CSID_GROUPS);
+    updateAll('umd');
+    updateAll('kmd');
+    updateAll('csid');
+}
+
+function renderCheckboxes(section, groups) {
+    var container = document.getElementById(section + '-checkboxes');
+    container.innerHTML = '';
+    groups.forEach(function(g) {
+        var item = document.createElement('div');
+        item.className = 'cb-item';
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.id = section + '-cb-' + g.id;
+        cb.addEventListener('change', function() {
+            state[section][g.id] = cb.checked ? g.bit : undefined;
+            updateAll(section);
+        });
+
+        var lbl = document.createElement('label');
+        lbl.htmlFor = cb.id;
+        lbl.className = 'cb-label';
+
+        var noteHtml = g.note ? '<span class="cb-note">' + g.note + '</span>' : '';
+        lbl.innerHTML =
+            '<span class="cb-name">' + g.prefix + '<span class="suffix">' + g.suffix + '</span></span>' +
+            '<span class="cb-meta">bit ' + g.bit + ' &mdash; ' + g.desc + noteHtml + '</span>';
+
+        item.appendChild(cb);
+        item.appendChild(lbl);
+        container.appendChild(item);
+    });
+}
+
+// ============================================================
+//  MASK COMPUTATION  (BigInt for 64-bit UMD masks)
+// ============================================================
+function computeMask(section) {
+    var mask = BigInt(0);
+    var groups = section === 'umd' ? UMD_GROUPS : section === 'kmd' ? KMD_GROUPS : CSID_GROUPS;
+    groups.forEach(function(g) {
+        if (state[section][g.id] !== undefined) {
+            mask = mask | (BigInt(1) << BigInt(g.bit));
+        }
+    });
+    return mask;
+}
+
+function toHex(mask) {
+    if (mask === BigInt(0)) return '0x0';
+    return '0x' + mask.toString(16).toUpperCase();
+}
+
+function countSelected(section) {
+    var bits = new Set();
+    var groups = section === 'umd' ? UMD_GROUPS : section === 'kmd' ? KMD_GROUPS : CSID_GROUPS;
+    groups.forEach(function(g) {
+        if (state[section][g.id] !== undefined) bits.add(g.bit);
+    });
+    return bits.size;
+}
+
+// ============================================================
+//  UPDATE UI
+// ============================================================
+function updateAll(section) {
+    var mask   = computeMask(section);
+    var hexStr = toHex(mask);
+    var decStr = mask.toString();
+
+    document.getElementById(section + '-mask-hex').textContent = hexStr;
+    document.getElementById(section + '-mask-dec').textContent = decStr;
+
+    var cnt = countSelected(section);
+    document.getElementById(section + '-count').innerHTML =
+        'Selected: <strong>' + cnt + '</strong> group' + (cnt !== 1 ? 's' : '');
+
+    renderCommands(section, hexStr);
+}
+
+function renderCommands(section, hexStr) {
+    var body = document.getElementById(section + '-commands-body');
+    var lines = buildCommandLines(section, hexStr);
+    body.innerHTML = lines.map(function(l) {
+        return '<span class="cmd-line">' + l + '</span>';
+    }).join('\n');
+}
+
+function hl(cls, txt) {
+    return '<span class="' + cls + '">' + txt + '</span>';
+}
+
+function buildCommandLines(section, hexStr) {
+    var v = hl('cmd-val', hexStr);
+    if (section === 'umd') {
+        return [
+            hl('cmd-kw','adb') + ' root',
+            hl('cmd-kw','adb') + ' remount',
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"mkdir -p /vendor/etc/camera"'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo logConfigMask=' + hexStr + ' &gt;&gt; /vendor/etc/camera/camxoverridesettings.txt"'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo logInfoMask=' + hexStr + ' &gt;&gt; /vendor/etc/camera/camxoverridesettings.txt"'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo logVerboseMask=' + hexStr + ' &gt;&gt; /vendor/etc/camera/camxoverridesettings.txt"'),
+            '',
+            hl('cmd-comment','# Optional: also set entry/exit and warning masks'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo logEntryExitMask=' + hexStr + ' &gt;&gt; /vendor/etc/camera/camxoverridesettings.txt"'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo logWarningMask=' + hexStr + ' &gt;&gt; /vendor/etc/camera/camxoverridesettings.txt"')
+        ];
+    } else if (section === 'kmd') {
+        return [
+            hl('cmd-kw','adb') + ' root',
+            hl('cmd-kw','adb') + ' remount',
+            hl('cmd-comment','# Enable KMD log mask (no reboot needed)'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo ' + hexStr + ' &gt; /sys/module/cam_debug_util/parameters/debug_mdl"'),
+            '',
+            hl('cmd-comment','# Collect kernel logs'),
+            hl('cmd-kw','adb') + ' shell cat /proc/kmsg &gt; kmd_logs.txt'
+        ];
+    } else {
+        return [
+            hl('cmd-kw','adb') + ' root',
+            hl('cmd-comment','# Enable CSID IRQ debug mask (no reboot needed)'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo ' + hexStr + ' &gt; /sys/kernel/debug/camera_ife/ife_csid_debug"'),
+            '',
+            hl('cmd-comment','# Also enable ISP KMD log (CAM_ISP = bit 3)'),
+            hl('cmd-kw','adb') + ' shell ' + hl('cmd-str','"echo 0x8 &gt; /sys/module/cam_debug_util/parameters/debug_mdl"'),
+            '',
+            hl('cmd-comment','# Collect kernel logs'),
+            hl('cmd-kw','adb') + ' shell cat /proc/kmsg &gt; csid_logs.txt'
+        ];
+    }
+}
+
+// ============================================================
+//  SELECT / UNSELECT ALL
+// ============================================================
+function selectAll(section) {
+    var groups = section === 'umd' ? UMD_GROUPS : section === 'kmd' ? KMD_GROUPS : CSID_GROUPS;
+    groups.forEach(function(g) {
+        var cb = document.getElementById(section + '-cb-' + g.id);
+        if (cb) { cb.checked = true; state[section][g.id] = g.bit; }
+    });
+    updateAll(section);
+}
+
+function unselectAll(section) {
+    var groups = section === 'umd' ? UMD_GROUPS : section === 'kmd' ? KMD_GROUPS : CSID_GROUPS;
+    groups.forEach(function(g) {
+        var cb = document.getElementById(section + '-cb-' + g.id);
+        if (cb) { cb.checked = false; delete state[section][g.id]; }
+    });
+    updateAll(section);
+}
+
+// ============================================================
+//  APPLY MASK TO CHECKBOXES  (from text input)
+// ============================================================
+function applyMaskToCheckboxes(section, value) {
+    var mask;
+    try {
+        var t = value.trim();
+        if (!t || t === '0x' || t === '0X') { mask = BigInt(0); }
+        else { mask = BigInt(t); }
+    } catch(e) { return; }
+
+    var groups = section === 'umd' ? UMD_GROUPS : section === 'kmd' ? KMD_GROUPS : CSID_GROUPS;
+    groups.forEach(function(g) {
+        var cb = document.getElementById(section + '-cb-' + g.id);
+        var isSet = (mask & (BigInt(1) << BigInt(g.bit))) !== BigInt(0);
+        if (cb) cb.checked = isSet;
+        if (isSet) { state[section][g.id] = g.bit; }
+        else { delete state[section][g.id]; }
+    });
+    updateAll(section);
+}
+
+// ============================================================
+//  COPY COMMANDS
+// ============================================================
+function copyCommands(section) {
+    var mask   = computeMask(section);
+    var hexStr = toHex(mask);
+    var lines  = [];
+
+    if (section === 'umd') {
+        lines = [
+            'adb root',
+            'adb remount',
+            'adb shell "mkdir -p /vendor/etc/camera"',
+            'adb shell "echo logConfigMask='    + hexStr + ' >> /vendor/etc/camera/camxoverridesettings.txt"',
+            'adb shell "echo logInfoMask='      + hexStr + ' >> /vendor/etc/camera/camxoverridesettings.txt"',
+            'adb shell "echo logVerboseMask='   + hexStr + ' >> /vendor/etc/camera/camxoverridesettings.txt"',
+            '# Optional:',
+            'adb shell "echo logEntryExitMask=' + hexStr + ' >> /vendor/etc/camera/camxoverridesettings.txt"',
+            'adb shell "echo logWarningMask='   + hexStr + ' >> /vendor/etc/camera/camxoverridesettings.txt"'
+        ];
+    } else if (section === 'kmd') {
+        lines = [
+            'adb root',
+            'adb remount',
+            '# Enable KMD log mask (no reboot needed)',
+            'adb shell "echo ' + hexStr + ' > /sys/module/cam_debug_util/parameters/debug_mdl"',
+            '# Collect kernel logs',
+            'adb shell cat /proc/kmsg > kmd_logs.txt'
+        ];
+    } else {
+        lines = [
+            'adb root',
+            '# Enable CSID IRQ debug mask (no reboot needed)',
+            'adb shell "echo ' + hexStr + ' > /sys/kernel/debug/camera_ife/ife_csid_debug"',
+            '# Also enable ISP KMD log (CAM_ISP = bit 3)',
+            'adb shell "echo 0x8 > /sys/module/cam_debug_util/parameters/debug_mdl"',
+            '# Collect kernel logs',
+            'adb shell cat /proc/kmsg > csid_logs.txt'
+        ];
+    }
+
+    var text = lines.join('\n');
+    var btn  = document.getElementById(section + '-copy-btn');
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            flashCopied(btn);
+        }).catch(function() { fallbackCopy(text, btn); });
+    } else {
+        fallbackCopy(text, btn);
+    }
+}
+
+function fallbackCopy(text, btn) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity  = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    try { document.execCommand('copy'); flashCopied(btn); } catch(e) {}
+    document.body.removeChild(ta);
+}
+
+function flashCopied(btn) {
+    btn.textContent = '\u2705 Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() {
+        btn.textContent = '\uD83D\uDCCB Copy';
+        btn.classList.remove('copied');
+    }, 2000);
+}
+
+// ============================================================
+//  TAB SWITCHING
+// ============================================================
+function switchTab(evt, tab) {
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
+    evt.currentTarget.classList.add('active');
+    document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ============================================================
+//  BOOT
+// ============================================================
+init();
+</script>
+</body>
+</html>
